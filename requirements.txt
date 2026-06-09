@@ -1,5 +1,6 @@
-streamlit
+dash
+dash-bootstrap-components
 pandas
 numpy
 plotly
-dash
+streamlit
