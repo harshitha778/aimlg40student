@@ -1,6 +1,6 @@
-data/SDG_METADATA.csvdata/SDG_METADATA.csv 
-data/SDG_METADATA.csv 
-data/SDG_METADATA.csv 
-data/SDG_DATA_NATIONAL.csv 
-data/SDG_METADATA.csv 
-data/SDG_DATA_NATIONAL.csv 
+venv/
+__pycache__/
+*.pyc
+.env
+.streamlit/
+data/

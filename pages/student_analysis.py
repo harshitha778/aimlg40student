@@ -1,120 +1,125 @@
+import streamlit as st
 import pandas as pd
 import plotly.express as px
-from dash import html, dcc, Input, Output, callback
+from utils import load_data
 
-df: pd.DataFrame = pd.DataFrame()
+# Page config
+st.set_page_config(page_title="Student Analysis - Student Enrollment Analytics", layout="wide")
 
+# Theme colors
 ACCENT  = "#4F6EF7"
-SUCCESS = "#22C55E"
 WARNING = "#F59E0B"
-DANGER  = "#EF4444"
 
+# Title
+st.title("👨‍🎓 Student Analysis")
+st.write("Explore demographic and academic performance patterns across the student body.")
 
-def layout():
-    dept_options = [{"label": "All Departments", "value": "All"}] + [
-        {"label": d, "value": d} for d in sorted(df.department.unique())
-    ]
-    year_options = [{"label": "All Years", "value": "All"}] + [
-        {"label": y, "value": y} for y in ["Freshman", "Sophomore", "Junior", "Senior", "Graduate"]
-    ]
+# Load data
+df = load_data()
 
-    return html.Div(
-        [
-            html.Div([
-                html.H1("Student Analysis", className="page-title"),
-                html.P("Explore demographic and academic performance patterns across the student body.", className="page-sub"),
-            ], className="page-header"),
+if df.empty:
+    st.warning("No dataset loaded.")
+else:
+    # Filter columns side-by-side
+    col_f1, col_f2 = st.columns(2)
 
-            # Filters
-            html.Div([
-                html.Div([
-                    html.Label("Department", className="filter-label"),
-                    dcc.Dropdown(dept_options, value="All", id="sa-dept", clearable=False, className="filter-drop"),
-                ], className="filter-item"),
-                html.Div([
-                    html.Label("Year", className="filter-label"),
-                    dcc.Dropdown(year_options, value="All", id="sa-year", clearable=False, className="filter-drop"),
-                ], className="filter-item"),
-            ], className="filter-bar"),
+    with col_f1:
+        departments = ["All Departments"] + sorted(list(df.department.unique()))
+        selected_dept = st.selectbox("Select Department", departments)
+        
+    with col_f2:
+        years = ["All Years"] + ["Freshman", "Sophomore", "Junior", "Senior", "Graduate"]
+        selected_year = st.selectbox("Select Year", years)
 
-            # Charts
-            html.Div([
-                html.Div([
-                    html.H3("GPA by Department", className="chart-title"),
-                    dcc.Graph(id="sa-gpa-dept", config={"displayModeBar": False}, style={"height": "320px"}),
-                ], className="chart-card wide"),
-                html.Div([
-                    html.H3("Age Distribution", className="chart-title"),
-                    dcc.Graph(id="sa-age-hist", config={"displayModeBar": False}, style={"height": "320px"}),
-                ], className="chart-card"),
-            ], className="chart-row"),
+    # Filtered dataset
+    filtered = df.copy()
+    if selected_dept != "All Departments":
+        filtered = filtered[filtered.department == selected_dept]
+    if selected_year != "All Years":
+        filtered = filtered[filtered.year == selected_year]
 
-            html.Div([
-                html.Div([
-                    html.H3("GPA vs Age (by Gender)", className="chart-title"),
-                    dcc.Graph(id="sa-scatter", config={"displayModeBar": False}, style={"height": "320px"}),
-                ], className="chart-card wide"),
-                html.Div([
-                    html.H3("Students by Year", className="chart-title"),
-                    dcc.Graph(id="sa-year-bar", config={"displayModeBar": False}, style={"height": "320px"}),
-                ], className="chart-card"),
-            ], className="chart-row"),
-        ],
-        className="page-body",
-    )
+    if filtered.empty:
+        st.warning("No records match the current filters.")
+    else:
+        # Row 1 Charts
+        col_left, col_right = st.columns(2)
 
+        with col_left:
+            st.subheader("🎯 GPA by Department")
+            fig_gpa = px.box(
+                filtered, x="department", y="gpa", color="department",
+                color_discrete_sequence=px.colors.qualitative.Pastel,
+                template="plotly_white",
+            )
+            fig_gpa.update_layout(
+                margin=dict(l=10, r=10, t=10, b=40),
+                xaxis_tickangle=-30,
+                xaxis_title="",
+                yaxis_title="GPA",
+                showlegend=False,
+                paper_bgcolor="rgba(0,0,0,0)",
+                plot_bgcolor="rgba(0,0,0,0)",
+                font=dict(family="Inter, sans-serif", size=12, color="#1E293B"),
+            )
+            st.plotly_chart(fig_gpa, use_container_width=True)
 
-def register_callbacks(app):
-    @app.callback(
-        Output("sa-gpa-dept",  "figure"),
-        Output("sa-age-hist",  "figure"),
-        Output("sa-scatter",   "figure"),
-        Output("sa-year-bar",  "figure"),
-        Input("sa-dept", "value"),
-        Input("sa-year", "value"),
-    )
-    def update(dept, year):
-        filtered = df.copy()
-        if dept != "All":
-            filtered = filtered[filtered.department == dept]
-        if year != "All":
-            filtered = filtered[filtered.year == year]
+        with col_right:
+            st.subheader("🎂 Age Distribution")
+            fig_age = px.histogram(
+                filtered, x="age", nbins=20, color_discrete_sequence=[ACCENT],
+                template="plotly_white",
+            )
+            fig_age.update_layout(
+                margin=dict(l=10, r=10, t=10, b=40),
+                xaxis_title="Age",
+                yaxis_title="Students",
+                bargap=0.05,
+                paper_bgcolor="rgba(0,0,0,0)",
+                plot_bgcolor="rgba(0,0,0,0)",
+                font=dict(family="Inter, sans-serif", size=12, color="#1E293B"),
+            )
+            st.plotly_chart(fig_age, use_container_width=True)
 
-        # GPA box by department
-        fig1 = px.box(
-            filtered, x="department", y="gpa", color="department",
-            color_discrete_sequence=px.colors.qualitative.Pastel,
-            template="plotly_white",
-        )
-        fig1.update_layout(**_base_layout(), xaxis_tickangle=-30, xaxis_title="", yaxis_title="GPA", showlegend=False)
+        # Row 2 Charts
+        col_left2, col_right2 = st.columns(2)
 
-        # Age histogram
-        fig2 = px.histogram(filtered, x="age", nbins=20, color_discrete_sequence=[ACCENT], template="plotly_white")
-        fig2.update_layout(**_base_layout(), xaxis_title="Age", yaxis_title="Students", bargap=0.05)
+        with col_left2:
+            st.subheader("📈 GPA vs Age (by Gender)")
+            # Sample up to 500 for better Plotly rendering speed
+            sample_df = filtered.sample(min(len(filtered), 500), random_state=1)
+            fig_scatter = px.scatter(
+                sample_df, x="age", y="gpa", color="gender",
+                color_discrete_sequence=[ACCENT, "#A78BFA", WARNING, "#94A3B8"],
+                opacity=0.65, template="plotly_white",
+            )
+            fig_scatter.update_layout(
+                margin=dict(l=10, r=10, t=10, b=40),
+                xaxis_title="Age",
+                yaxis_title="GPA",
+                paper_bgcolor="rgba(0,0,0,0)",
+                plot_bgcolor="rgba(0,0,0,0)",
+                font=dict(family="Inter, sans-serif", size=12, color="#1E293B"),
+                legend=dict(orientation="h", y=1.1, title=None),
+            )
+            st.plotly_chart(fig_scatter, use_container_width=True)
 
-        # Scatter GPA vs Age
-        fig3 = px.scatter(
-            filtered.sample(min(len(filtered), 500), random_state=1),
-            x="age", y="gpa", color="gender",
-            color_discrete_sequence=[ACCENT, "#A78BFA", WARNING, "#94A3B8"],
-            opacity=0.65, template="plotly_white",
-        )
-        fig3.update_layout(**_base_layout(), xaxis_title="Age", yaxis_title="GPA")
-
-        # Year bar
-        year_order = ["Freshman", "Sophomore", "Junior", "Senior", "Graduate"]
-        yc = filtered.year.value_counts().reindex(year_order, fill_value=0).reset_index()
-        yc.columns = ["year", "count"]
-        fig4 = px.bar(yc, x="year", y="count", color="count", color_continuous_scale=["#C7D2FE", ACCENT], template="plotly_white")
-        fig4.update_layout(**_base_layout(), xaxis_title="", yaxis_title="Students", coloraxis_showscale=False)
-
-        return fig1, fig2, fig3, fig4
-
-
-def _base_layout():
-    return dict(
-        margin=dict(l=10, r=10, t=10, b=40),
-        paper_bgcolor="rgba(0,0,0,0)",
-        plot_bgcolor="rgba(0,0,0,0)",
-        font=dict(family="Inter, sans-serif", size=12, color="#1E293B"),
-    )
+        with col_right2:
+            st.subheader("📅 Students by Year")
+            year_order = ["Freshman", "Sophomore", "Junior", "Senior", "Graduate"]
+            yc = filtered.year.value_counts().reindex(year_order, fill_value=0).reset_index()
+            yc.columns = ["year", "count"]
+            
+            fig_year = px.bar(
+                yc, x="year", y="count", color="count",
+                color_continuous_scale=["#C7D2FE", ACCENT], template="plotly_white",
+            )
+            fig_year.update_layout(
+                margin=dict(l=10, r=10, t=10, b=40),
+                xaxis_title="",
+                yaxis_title="Students",
+                coloraxis_showscale=False,
+                paper_bgcolor="rgba(0,0,0,0)",
+                plot_bgcolor="rgba(0,0,0,0)",
+                font=dict(family="Inter, sans-serif", size=12, color="#1E293B"),
+            )
+            st.plotly_chart(fig_year, use_container_width=True)
